@@ -14,6 +14,8 @@ class ChatBubble extends StatelessWidget {
     this.noLabel,
     this.showRating = false,
     this.onRating,
+    this.onExportPdf,
+    this.onShowPrompt,
   });
 
   final Message message;
@@ -24,6 +26,8 @@ class ChatBubble extends StatelessWidget {
   final String? noLabel;
   final bool showRating;
   final ValueChanged<int>? onRating;
+  final VoidCallback? onExportPdf;
+  final VoidCallback? onShowPrompt;
 
   bool get _isUser => message.role == MessageRole.user;
 
@@ -175,19 +179,75 @@ class ChatBubble extends StatelessWidget {
                 final score = index + 1;
                 return OutlinedButton.icon(
                   onPressed: () => onRating?.call(score),
-                  icon: const Icon(Icons.star, color: Colors.amber, size: 18),
+                  icon: const Icon(Icons.star, color: Colors.amber, size: 16),
                   label: Text('$score'),
                   style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(40, 36),
+                    visualDensity: VisualDensity.compact,
                     shape: const StadiumBorder(),
                     side: const BorderSide(color: Color(0xFF1A1A2E)),
                     foregroundColor: const Color(0xFF1A1A2E),
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
+                      horizontal: 10,
+                      vertical: 6,
                     ),
                   ),
                 );
               }),
+            ),
+          ),
+        if (showRating && (onExportPdf != null || onShowPrompt != null))
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Wrap(
+              spacing: 10,
+              runSpacing: 8,
+              children: [
+                if (onExportPdf != null)
+                  Tooltip(
+                    message: 'PDF indir ve paylaş',
+                    child: Semantics(
+                      button: true,
+                      label: 'PDF indir ve paylaş',
+                      child: ElevatedButton.icon(
+                        onPressed: onExportPdf,
+                        icon: const Icon(Icons.picture_as_pdf_outlined),
+                        label: const Text('PDF İndir'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1A1A2E),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                          shape: const StadiumBorder(),
+                        ),
+                      ),
+                    ),
+                  ),
+                if (onShowPrompt != null)
+                  Tooltip(
+                    message: 'Kullanılan promptu göster ve panoya kopyala',
+                    child: Semantics(
+                      button: true,
+                      label: 'Promptu göster',
+                      child: OutlinedButton.icon(
+                        onPressed: onShowPrompt,
+                        icon: const Icon(Icons.code),
+                        label: const Text('Promptu Göster'),
+                        style: OutlinedButton.styleFrom(
+                          shape: const StadiumBorder(),
+                          side: const BorderSide(color: Color(0xFF1A1A2E)),
+                          foregroundColor: const Color(0xFF1A1A2E),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
       ],

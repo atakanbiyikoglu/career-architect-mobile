@@ -10,10 +10,13 @@ class CustomDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Drawer(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-      backgroundColor: Color(0xFF0F172A),
-      child: SafeArea(child: DrawerContent()),
+    return const SizedBox(
+      width: 280,
+      child: Drawer(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+        backgroundColor: Color(0xFF0F172A),
+        child: SafeArea(child: DrawerContent()),
+      ),
     );
   }
 }

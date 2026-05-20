@@ -5,6 +5,11 @@ import '../models/message.dart';
 import '../providers/chat_provider.dart';
 import '../widgets/chat_bubble.dart';
 import '../widgets/custom_drawer.dart';
+import '../services/report_pdf_service.dart';
+import '../services/download_helper.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:printing/printing.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({super.key});
@@ -64,7 +69,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final notifier = ref.read(chatProvider.notifier);
     final isTesting =
         notifier.flowState == 'TESTING' || notifier.flowState == 'TEST_INTRO';
-    final isFeedback = notifier.flowState == 'FEEDBACK';
+    final isFeedback =
+        notifier.flowState == 'FEEDBACK' ||
+        ref.watch(feedbackSubmittedProvider);
     final isAiUnlock = notifier.flowState == 'AI_UNLOCK';
     final isInputDisabled = isTesting || isAiUnlock;
 
@@ -95,7 +102,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: isWide
           ? null
           : AppBar(
@@ -107,6 +114,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               leading: Builder(
                 builder: (context) => IconButton(
                   icon: const Icon(Icons.menu),
+                  color: appBarForeground,
                   onPressed: () => Scaffold.of(context).openDrawer(),
                 ),
               ),
@@ -121,7 +129,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       body: isWide
           ? Row(
               children: [
-                const SizedBox(width: 260, child: CustomDrawer()),
+                const SizedBox(width: 280, child: CustomDrawer()),
                 Expanded(
                   child: Column(
                     children: [
@@ -227,6 +235,98 @@ class _ChatBody extends StatelessWidget {
                   noLabel: isUnlockOptions ? 'Hayır, devam et' : null,
                   showRating: showRating,
                   onRating: notifier.submitFeedback,
+                  onExportPdf: showRating
+                      ? () async {
+                          final pdfService = ReportPdfService();
+                          final aiMsgs = messages
+                              .where((m) => m.role == MessageRole.ai)
+                              .toList();
+                          final reportText = aiMsgs.isNotEmpty
+                              ? aiMsgs.last.content
+                              : '';
+                          final filename =
+                              'kariyer-analiz-${DateTime.now().toIso8601String().split('T').first}.pdf';
+                          try {
+                            final bytes = await pdfService.buildHistoryPdf(
+                              participantName: notifier.studentName,
+                              school: notifier.school,
+                              department: notifier.department,
+                              currentGoal: notifier.currentGoal,
+                              testType: message.content,
+                              createdAt: DateTime.now().toIso8601String(),
+                              sourceModel: notifier.experimentGroup,
+                              testResults: notifier.testAnswers,
+                              reportText: reportText,
+                            );
+                            if (kIsWeb) {
+                              await downloadFile(bytes, filename);
+                            } else {
+                              await Printing.sharePdf(
+                                bytes: bytes,
+                                filename: filename,
+                              );
+                            }
+                            if (context.mounted) {
+                              final message = kIsWeb
+                                  ? 'PDF indirildi.'
+                                  : 'PDF paylaşım ekranı açıldı.';
+                              ScaffoldMessenger.of(
+                                context,
+                              ).showSnackBar(SnackBar(content: Text(message)));
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              final message = kIsWeb
+                                  ? 'PDF dışa aktarılamadı — tarayıcıda PDF paylaşımı desteklenmeyebilir.'
+                                  : 'PDF dışa aktarılamadı.';
+                              ScaffoldMessenger.of(
+                                context,
+                              ).showSnackBar(SnackBar(content: Text(message)));
+                            }
+                          }
+                        }
+                      : null,
+                  onShowPrompt: showRating
+                      ? () async {
+                          final prompt =
+                              '''Katılımcı: ${notifier.studentName}\nOkul: ${notifier.school}\nBölüm: ${notifier.department}\nHedef: ${notifier.currentGoal}\nAnaliz Türü: ${message.content}\nRapor Özeti:\n${messages.where((m) => m.role == MessageRole.ai).toList().isNotEmpty ? messages.where((m) => m.role == MessageRole.ai).toList().last.content : ''}''';
+                          await showDialog(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('Kullanılan Prompt'),
+                              content: SingleChildScrollView(
+                                child: SelectableText(prompt),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () {
+                                    Clipboard.setData(
+                                      ClipboardData(text: prompt),
+                                    );
+                                    Navigator.of(ctx).pop();
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Prompt panoya kopyalandı.',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  child: const Text('Kopyala'),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.of(ctx).pop(),
+                                  child: const Text('Kapat'),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+                      : null,
                 ),
               );
             },
